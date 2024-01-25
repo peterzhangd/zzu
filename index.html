@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>郑州大学数据中台2021</title>
+    <link rel="stylesheet" href="./css/interface_style.css">
+    <link rel="stylesheet" href="./css/passcode_style.css">
+    <link rel="shortcut icon" href="./cxk_icon.ico" type="image/x-icon">
+    <script src="./scripts/moment.js"></script>
+
+    <script language="javascript">
+        let timerID;
+        let flip = true;
+        let isCodeExpired = false;
+        let localPasscodeImgPath;
+
+        function flipEvent() {
+            flip = !flip;
+            if (flip) border_1.style.backgroundColor = border_2.style.backgroundColor = border_3.style.backgroundColor =
+                border_4.style.backgroundColor = "#bfffc8";
+            else border_1.style.backgroundColor = border_2.style.backgroundColor = border_3.style.backgroundColor =
+                border_4.style.backgroundColor = "#090";
+        }
+
+        function getConfig(url) {
+            return fetch(url, {
+                cache: "no-store"
+            }).then(response => {
+                if (!response.ok) {
+                    throw new Error('Unable to get config data.');
+                }
+                return response.json();
+            });
+        }
+
+        function handleDatetime(inputDate) {
+            const utcTime = moment.utc();
+            const utcPlus8Time = moment(utcTime).utcOffset(8);
+            const givenDate = moment.utc(inputDate, "YYYY-MM-DD HH:mm:ss Z").utcOffset(8);
+            const today = utcPlus8Time.startOf('day');
+            const yesterday = today.clone().subtract(1, 'day');
+            const daysDifference = utcPlus8Time.diff(givenDate, 'days');
+            localPasscodeImgPath = "./images/passcode.png?date=" + givenDate.format("YYYYMMDD");
+
+            if (givenDate.isSameOrAfter(today)) {
+                return "今天";
+            } else {
+                isCodeExpired = true;
+                if (givenDate.isSameOrAfter(yesterday)) {
+                    return "昨天";
+                } else if (daysDifference < 7) {
+                    return `${daysDifference}天前`;
+                } else if (daysDifference < 31) {
+                    return `${Math.floor(daysDifference / 7)}周前`;
+                } else if (daysDifference <= 365) {
+                    return `${Math.floor(daysDifference / 30)}个月前`;
+                } else {
+                    return `${Math.floor(daysDifference / 365)}年前`;
+                }
+            }
+        }
+
+        function handleFiles() {
+            const photo = document.getElementById("photo").files[0];
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const imageUrl = e.target.result;
+                const imgElement = document.getElementById("user_portrait");
+                const imgElement_pre = document.getElementById("user_portrait_preview");
+                const imgElement_pres = document.getElementById("user_portrait_passcode");
+                imgElement.src = imageUrl;
+                imgElement_pre.src = imageUrl;
+                imgElement_pres.src = imageUrl;
+            };
+            reader.readAsDataURL(photo);
+        }
+
+        function PrefixInteger(num) {
+            return (Array(2).join('0') + num).slice(-2);
+        }
+
+        function showTime() {
+            const myDate = new Date();
+            const month = PrefixInteger(myDate.getMonth() + 1);
+            const day = PrefixInteger(myDate.getDate());
+            const hours = PrefixInteger(myDate.getHours());
+            const minutes = PrefixInteger(myDate.getMinutes());
+            const currentTime = document.getElementById("current_time");
+            currentTime.innerHTML = "(" + month + "月" + day + "日" + " " + hours + ":" + minutes + "获取)";
+        }
+
+        function checkImgExists(imgurl) {
+            return new Promise(function (resolve, reject) {
+                var ImgObj = new Image()
+                ImgObj.src = imgurl
+                ImgObj.onload = function (res) {
+                    resolve(res)
+                }
+                ImgObj.onerror = function (err) {
+                    reject(err)
+                }
+            })
+        }
+
+        function changeIdentity(selectedValue) {
+            const identityElement = document.getElementById("identity");
+            if (selectedValue === '0') {
+                identityElement.innerText = "本科生";
+            } else {
+                identityElement.innerText = "研究生";
+            }
+        }
+
+        function changeLocation(selectedValue) {
+            const locationElement = document.getElementById("location");
+            const mainGate = document.getElementById("gate");
+            switch (selectedValue) {
+                case 'east':
+                    locationElement.innerHTML = "定位主校区东大门附近";
+                    mainGate.innerText = "东门";
+                    break;
+                case 'north':
+                    locationElement.innerHTML = "定位主校区北大门附近";
+                    mainGate.innerText = "北门";
+                    break;
+                case 'south':
+                    locationElement.innerHTML = "定位主校区南大门附近";
+                    mainGate.innerText = "南门";
+                    break;
+            }
+        }
+
+        function generate_passcode() {
+            timerID = setInterval("flipEvent()", 1000);
+            flipEvent();
+            showTime();
+            interface.style.display = 'none';
+            gatepasscode.style.display = 'block';
+        }
+
+        function return_to_interface() {
+            clearInterval(timerID);
+            gatepasscode.style.display = 'none';
+            interface.style.display = 'flex';
+        }
+    </script>
+</head>
+
+<body>
+    <div id="interface">
+        <div id="preview">
+            <label style="position: relative; bottom: 8px;">照片预览</label><br>
+
+            <img src="./images/preview.jpg" id="user_portrait_preview" style="height:200px; margin-bottom: 10px;"
+                alt="user's portrait preview"><br>
+            <div style="text-align: center;"><label id="image_select"><input type="file" id="photo"
+                        onchange="handleFiles()" accept="image/*" style="display: none;">更改图片</label></div>
+        </div>
+        <form id="info_form">
+            <div style="text-align: center;"><label>通行码最后更新于</label><label id="last_update_time"></label></div><br>
+            <div class="info-item"><label for="name">大门：<select name='gate' onchange="changeLocation(this.value)">
+                        <option value='east' selected='selected'>东门</option>
+                        <option value='north'>北门</option>
+                        <option value='south'>南门</option>
+                    </select></label><br></div>
+            <div class="info-item"><label for="identity">身份：<select name='identity'
+                        onchange="changeIdentity(this.value)">
+                        <option value='0' selected='selected'>本科生</option>
+                        <option value='1'>研究生</option>
+                    </select></label><br></div>
+            <div class="info-item"><label for="name">姓名：<input type="text" id="name" name="name"
+                        placeholder="杰森"></label><br></div>
+            <div class="info-item"><label for="college">学院：<input type="text" id="college" name="college"
+                        placeholder="电气信息学院"></label><br></div>
+            <div class="info-submit" style="text-align: center;"><button type="submit">生成通行码</button></div>
+        </form>
+        <div style="width:0;height:0;display: none;">
+            <img id="passcode_img_preload" alt="preImg"><img src="./images/sheng.png" alt="preImg"><img
+                src="./images/split.png" alt="preImg">
+        </div>
+    </div>
+
+    <div id="gatepasscode" style="display: none;">
+        <div style="width:100%;height:88px;">
+            <img id="passcode_image" src="">
+        </div>
+        <div style="width:100%;height:7px;BACKGROUND-IMAGE: url(./images/split.png)"></div>
+        <div style="width:100%; min-height:90px;">
+            <div style="width:100%;height:6px;text-align:left;"></div>
+            <div
+                style="width:100%;min-height:26px;line-height:26px;font-size:16px;color:#00c;font-weight:500;font-family:黑体;BACKGROUND-IMAGE:url(./images/sheng.png)">
+                <span id="college_and_name" style="color:#00a">college.name</span>　<a
+                    href="javascript:return_to_interface();"><span
+                        style="font-size:12px;;color:#00c;">〖切换账号〗</span></a><br>主校区大门<span id="gate">东门</span>.<span
+                    style="background-color:#070;color:#ff0">入口</span><br>身份：正常出入校园<span id="identity">本科生</span><span
+                    style="font-size:12px;color:#333;" id="current_time">(00月00日 00:00获取)</span><br><span
+                    style="color:#f00;font-size:12px">提醒：未检索到你今日出校记录</span>
+            </div>
+        </div>
+        <div style="width: 100%; height: 15px; background-color: rgb(0, 153, 0);" id="bian92a"></div>
+
+        <div style="width:100%;height:280px;">
+            <div style="width: 15px; height: 100%; background-color: rgb(0, 153, 0); float: left;" id="bian92b1"></div>
+            <div style="width:320px;height:100%;float:left;text-align:center;"><img src="./images/preview.jpg"
+                    id="user_portrait" style="height:280px;border:0px;" alt="user's portrait"></div>
+            <div style="width: 14px; height: 100%; background-color: rgb(0, 153, 0); float: right;" id="bian92b2"></div>
+        </div>
+        <div style="width: 100%; height: 15px; background-color: rgb(0, 153, 0);" id="bian92c"></div>
+        <div style="width:100%;height:7px;BACKGROUND-IMAGE: url(./images/split.png)"></div>
+        <div style="width:100%;height:116px;">
+            <div style="width:100%;height:80px;" id="msg11a">
+                <div class="hes1"><br>不再检测核酸时间</div>
+                <div style="width:20px;height:100%;float:left"></div>
+                <div class="yim1"><br>新冠疫苗接种<br>3剂次</div>
+                <div style="width:2px;height:100%;float:right"></div>
+            </div>
+            <div class="bar916">
+                <div style="width:50%;height:100%;float:left;font-size:12px;color:#666;line-height:20px;" id="msg11b">
+                </div>
+                <div style="width:48%;height:100%;float:right;font-size:12px;color:#666;line-height:20px;" id="msg11c">
+                    <span id="location" style="color:#00a">定位主校区东大门附近</span>　<span style="color:#00c">扫码在设定区域内</span>
+                </div>
+            </div>
+        </div>
+        <div style="width:100%;height:7px;BACKGROUND-IMAGE: url(./images/split.png)"></div>
+        <div style="width:100%;min-height:18px;line-height:18px;font-size:12px;color:#666;text-align:center">
+            郑州大学疫情防控领导小组、保卫处、信息化办公室</div>
+    </div>
+    <script>
+        // 获取当前日期
+        var currentDate = new Date();
+        var dayOfWeek = currentDate.getDay(); // 获取当前是星期几，0表示周日，1表示周一，依此类推
+
+        // 随机选择图片
+        function getRandomImage(imagesFolder) {
+            var images = ['1.png']; // 替换为您实际的图片文件名
+            var randomIndex = Math.floor(Math.random() * images.length);
+            return imagesFolder + '/' + images[randomIndex];
+        }
+
+        // 根据不同的日期随机选择通行码图片链接
+        var passcodeImage = document.getElementById('passcode_image');
+        switch (dayOfWeek) {
+            case 1: // 周一
+                passcodeImage.src = getRandomImage('./images1');
+                break;
+            case 2: // 周二
+                passcodeImage.src = getRandomImage('./images2');
+                break;
+            case 3: // 周三
+                passcodeImage.src = getRandomImage('./images3');
+                break;
+            case 4: // 周四
+                passcodeImage.src = getRandomImage('./images4');
+                break;
+            case 5: // 周五
+                passcodeImage.src = getRandomImage('./images5');
+                break;
+            case 6: // 周六
+                passcodeImage.src = getRandomImage('./images6');
+                break;
+            case 7: // 周七
+                passcodeImage.src = getRandomImage('./images7');
+                break;
+            default:
+                passcodeImage.src = "./images/passcode.png"; // 默认情况
+        }
+        const interface = document.getElementById('interface');
+        const gatepasscode = document.getElementById('gatepasscode');
+        const form = document.getElementById('info_form');
+        const border_1 = document.getElementById('bian92a');
+        const border_2 = document.getElementById('bian92b1');
+        const border_3 = document.getElementById('bian92b2');
+        const border_4 = document.getElementById('bian92c');
+        form.addEventListener("submit", function (event) {
+            event.preventDefault();
+            let name = document.getElementById("name").value;
+            let college = document.getElementById("college").value;
+            name = name ? name : "张振";
+            college = college ? college : "电气信息学院";
+            document.getElementById("college_and_name").innerHTML = college + "." + name;
+            if (isCodeExpired) alert("通行码图片已过期，需要更新！");
+            generate_passcode();
+        });
+        getConfig('./config.json')
+            .then(config => {
+                const lastUpdateTimeLabel = document.getElementById('last_update_time');
+                const passcode_url = config.passcode_url;
+                lastUpdateTimeLabel.textContent = handleDatetime(config.last_update_time);
+                checkImgExists(passcode_url).then(() => {
+                    document.getElementById('passcode_img_preload').src = passcode_url;
+                    document.getElementById('passcodeImg').style.backgroundImage = `url(${passcode_url})`;
+                }).catch(() => {
+                    //fail callback
+                    document.getElementById('passcode_img_preload').src = localPasscodeImgPath;
+                    document.getElementById('passcodeImg').style.backgroundImage =
+                        `url(${localPasscodeImgPath})`;
+                })
+            });
+    </script>
+</body>
+
+</html>
